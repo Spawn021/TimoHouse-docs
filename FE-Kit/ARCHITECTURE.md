@@ -60,7 +60,7 @@ Kit chỉ dùng cho domain frontend. Từ v2.4.0 code tách làm hai tầng đ�
 | Lớp | Thành phần | Nguồn | Thực thi bởi |
 |---|---|---|---|
 | Hướng dẫn | Skill `frontend-delivery-standard`, rule, template | `core/SKILL.md`, `core/rules/`, `core/templates/` | Prompt (mềm) |
-| Điều phối | 12 slash command | `core/commands/` + đoạn delegation do generator chèn | Prompt (mềm) |
+| Điều phối | 14 slash command | `core/commands/` + đoạn delegation do generator chèn | Prompt (mềm) |
 | Vai trò | 7 subagent | `core/agents/` + `_protocol.md` | `disallowedTools` (cứng) + prompt |
 | Gate khi bắt đầu mode | `fe_begin_mode`, `fe-kit mode begin` | `createModeBriefing` (engine) → `evaluateModeEntry` (luật FE trong `pack-fe/src/transitions.mjs`) | MCP tool / CLI trả verdict + nguyên văn rule |
 | Gate khi chạy | Hook | `runHook` (engine), gắn pack ở `core/hooks/fe-hook.mjs` | Claude Code hook (cứng ở mức `enforce`) |
@@ -150,7 +150,7 @@ Giới hạn đã biết (đều có test trong `tests/hook.test.mjs`):
 | Adapter | Kiểm tra lúc agent chạy | Cách kiểm thủ công |
 |---|---|---|
 | Claude Code (plugin `fe`) | MCP `fe_begin_mode`/`fe_validate_workflow`/`fe_scope_diff`, hook, `disallowedTools` | Như cột bên dưới, khi cần |
-| Codex, Cursor, Copilot | Không có: chỉ hướng dẫn trong prompt | `node bin/fe-kit.mjs mode begin <task> <mode>` khi mở mode và `mode end` trước khi kết thúc (cùng gate với hook); `node bin/fe-kit.mjs validate-pr <task> --base <nhánh>` trước PR. Copilot có thêm workflow CI `frontend-delivery-standard.yml` |
+| Codex, Cursor, Copilot, Antigravity | Không có: chỉ hướng dẫn trong prompt | `node bin/fe-kit.mjs mode begin <task> <mode>` khi mở mode và `mode end` trước khi kết thúc (cùng gate với hook); `node bin/fe-kit.mjs validate-pr <task> --base <nhánh>` trước PR. Copilot có thêm workflow CI `frontend-delivery-standard.yml` |
 | ChatGPT skill | Không có | `node scripts/validate-workflow.mjs <task>`, `node scripts/validate-pr.mjs <task> --base <nhánh>` trong gói skill |
 
 `bin/fe-kit.mjs` là bản CLI standalone mà `fe-kit init` copy vào repo dự án. Hướng dẫn của từng adapter (`core/adapters/*`, `core/SKILL.md`) ghi rõ: chưa chạy lệnh, hoặc lệnh báo lỗi, thì không được ghi gate là passed.

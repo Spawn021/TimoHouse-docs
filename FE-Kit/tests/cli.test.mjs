@@ -77,6 +77,91 @@ describe('fe-kit init', () => {
     expect(exists('.codex/prompts/figma-extract.md')).toBe(true);
   });
 
+  it('antigravity: rule có trigger hợp lệ, mỗi lệnh là skill .agents/skills/fe-<cmd>/SKILL.md', () => {
+    expect(kit('init', '--target', target, '--agents', 'antigravity', '--yes').status).toBe(0);
+    const ruleDir = path.join(target, '.agents', 'rules');
+    const rules = fs.readdirSync(ruleDir);
+    expect(rules.sort()).toEqual(['frontend-delivery-code.md', 'frontend-delivery-standard.md', 'frontend-delivery-task.md']);
+    for (const rule of rules) {
+      // Antigravity bỏ qua im lặng rule thiếu frontmatter hoặc trigger sai.
+      const text = fs.readFileSync(path.join(ruleDir, rule), 'utf8');
+      expect(text).toMatch(/^---\ntrigger: (always_on|model_decision|glob|manual)\n/);
+      if (/^trigger: glob$/m.test(text)) expect(text).toMatch(/^globs: ".+"$/m);
+      expect(Buffer.byteLength(text)).toBeLessThan(24000);
+    }
+
+    // Workflow đã bị Antigravity deprecate: không sinh .agents/workflows nữa.
+    expect(exists('.agents/workflows')).toBe(false);
+    const commands = fs.readdirSync(path.join(ROOT, 'core', 'commands')).filter((f) => f.endsWith('.md')).map((f) => f.replace(/\.md$/, ''));
+    const skills = fs.readdirSync(path.join(target, '.agents', 'skills')).sort();
+    expect(skills).toEqual([...commands.map((c) => 'fe-' + c), 'frontend-delivery-standard'].sort());
+    for (const cmd of commands) {
+      const skill = read('.agents/skills/fe-' + cmd + '/SKILL.md');
+      // name trùng tên thư mục (Antigravity lấy làm lệnh /fe-<cmd>), description bắt buộc.
+      expect(skill.startsWith('---\nname: fe-' + cmd + '\ndescription: "FE ' + cmd + ': ')).toBe(true);
+      expect(skill).toMatch(/^---\n[\s\S]*?\n---\n\n<!-- fe-kit:generated/);
+      expect(skill).not.toMatch(/argument-hint:/);
+    }
+    const cook = read('.agents/skills/fe-cook/SKILL.md');
+    expect(cook).toMatch(/`\/fe-cook <task-folder>`/);
+    expect(cook).toMatch(/mode begin <task-folder> cook --actor antigravity/);
+    expect(cook).toMatch(/mode end <task-folder> cook --actor antigravity/);
+    // task/new-task/retro/context không phải mode: không có bước mode begin/end.
+    expect(read('.agents/skills/fe-task/SKILL.md')).not.toMatch(/^1\. Bắt đầu: /m);
+    const ctx = read('.agents/skills/fe-context/SKILL.md');
+    expect(ctx).not.toMatch(/^1\. Bắt đầu: /m);
+    expect(ctx).toMatch(/docs\/frontend-context\/project-source-context\.md/);
+    // context không gọi tool fe_*: không nhắc thay MCP bằng CLI; cook thì có.
+    expect(ctx).not.toMatch(/Antigravity không có MCP tool/);
+    expect(cook).toMatch(/Antigravity không có MCP tool/);
+
+    // Skill lệnh gọi skill frontend-delivery-standard: phải được cài, kèm đoạn chạy không MCP.
+    const std = read('.agents/skills/frontend-delivery-standard/SKILL.md');
+    expect(std).toMatch(/^---\nname: frontend-delivery-standard\ndescription: .+\n---\n\n# /);
+    expect(std).toMatch(/## Chạy trong Antigravity/);
+    expect(std).toMatch(/mode begin <task-folder> <mode> --actor antigravity/);
+    expect(std).toMatch(/## Luôn áp dụng/);
+    expect(JSON.parse(read('.frontend-delivery/install.json')).agents).toEqual(['antigravity']);
+  });
+
+  it('antigravity: init lại giữ skill/rule/workflow của team, dọn workflow fe-* cũ và skill kit đã bỏ', () => {
+    fs.mkdirSync(path.join(target, '.agents', 'workflows'), { recursive: true });
+    fs.mkdirSync(path.join(target, '.agents', 'rules'), { recursive: true });
+    fs.mkdirSync(path.join(target, '.agents', 'skills', 'fe-team'), { recursive: true });
+    fs.writeFileSync(path.join(target, '.agents', 'workflows', 'deploy.md'), 'team workflow\n');
+    fs.writeFileSync(path.join(target, '.agents', 'workflows', 'fe-cook.md'), 'bản adapter cũ\n');
+    fs.writeFileSync(path.join(target, '.agents', 'rules', 'team.md'), '---\ntrigger: always_on\n---\nteam\n');
+    fs.writeFileSync(path.join(target, '.agents', 'skills', 'fe-team', 'SKILL.md'), '---\nname: fe-team\ndescription: team\n---\n');
+    kit('init', '--target', target, '--agents', 'antigravity', '--yes');
+    // Skill kit sinh ở lần trước nhưng nay không còn lệnh tương ứng.
+    fs.mkdirSync(path.join(target, '.agents', 'skills', 'fe-obsolete'));
+    fs.writeFileSync(path.join(target, '.agents', 'skills', 'fe-obsolete', 'SKILL.md'), read('.agents/skills/fe-pr/SKILL.md'));
+    kit('init', '--target', target, '--agents', 'antigravity', '--yes');
+
+    expect(read('.agents/workflows/deploy.md')).toBe('team workflow\n');
+    expect(exists('.agents/workflows/fe-cook.md')).toBe(false);
+    expect(exists('.agents/rules/team.md')).toBe(true);
+    expect(exists('.agents/skills/fe-team/SKILL.md')).toBe(true);
+    expect(exists('.agents/skills/fe-obsolete')).toBe(false);
+    expect(exists('.agents/skills/fe-plan/SKILL.md')).toBe(true);
+  });
+
+  it('antigravity: init xoá thư mục workflows rỗng sau khi dọn bản cũ', () => {
+    fs.mkdirSync(path.join(target, '.agents', 'workflows'), { recursive: true });
+    fs.writeFileSync(path.join(target, '.agents', 'workflows', 'fe-plan.md'), 'bản adapter cũ\n');
+    kit('init', '--target', target, '--agents', 'antigravity', '--yes');
+    expect(exists('.agents/workflows')).toBe(false);
+  });
+
+  it('antigravity: doctor --strict báo thiếu khi xoá skill, alias google-antigravity hợp lệ', () => {
+    kit('init', '--target', target, '--agents', 'google-antigravity', '--yes');
+    expect(project('doctor', '--strict').status).toBe(0);
+    fs.rmSync(path.join(target, '.agents', 'skills', 'fe-cook'), { recursive: true });
+    const r = project('doctor', '--strict');
+    expect(r.status).toBe(1);
+    expect(r.out).toMatch(/MISSING \.agents\/skills\/fe-cook\/SKILL\.md/);
+  });
+
   it('init lại không đè file của team', () => {
     fs.writeFileSync(path.join(target, 'CLAUDE.md'), '# Dự án của team\n\nGhi chú riêng.\n');
     kit('init', '--target', target, '--agents', 'claude', '--yes');

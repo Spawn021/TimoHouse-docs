@@ -25229,7 +25229,7 @@ var PLUGIN_ID = "fe@frontend-delivery";
 var MARKETPLACE_NAME = "frontend-delivery";
 var args = process.argv.slice(2);
 var command = args[0] || "help";
-var AGENT_ORDER = ["codex", "claude", "cursor", "github"];
+var AGENT_ORDER = ["codex", "claude", "cursor", "github", "antigravity"];
 var AGENT_ALIASES = {
   all: "all",
   everything: "all",
@@ -25243,13 +25243,16 @@ var AGENT_ALIASES = {
   github: "github",
   copilot: "github",
   "github-copilot": "github",
-  gh: "github"
+  gh: "github",
+  antigravity: "antigravity",
+  "google-antigravity": "antigravity"
 };
 var AGENT_LABELS = {
   codex: "Codex / OpenAI coding agents",
   claude: "Claude Code",
   cursor: "Cursor",
-  github: "GitHub Copilot"
+  github: "GitHub Copilot",
+  antigravity: "Google Antigravity"
 };
 function argValueFlexible(name2, fallback = "") {
   const eq = args.find((a) => a.startsWith(name2 + "="));
@@ -25259,12 +25262,12 @@ function argValueFlexible(name2, fallback = "") {
 function normalizeAgents(raw) {
   const input2 = String(raw || "").trim();
   if (!input2) return [];
-  const numberMap = { "1": "all", "2": "codex", "3": "claude", "4": "cursor", "5": "github" };
+  const numberMap = { "1": "all", "2": "codex", "3": "claude", "4": "cursor", "5": "github", "6": "antigravity" };
   const tokens = input2.split(/[,+\s]+/).map((t) => t.trim().toLowerCase()).filter(Boolean).map((t) => numberMap[t] || t);
   const selected = /* @__PURE__ */ new Set();
   for (const token of tokens) {
     const normalized = AGENT_ALIASES[token];
-    if (!normalized) throw new Error("Unknown agent target: " + token + ". Valid values: all, codex/openai, claude, cursor, github/copilot.");
+    if (!normalized) throw new Error("Unknown agent target: " + token + ". Valid values: all, codex/openai, claude, cursor, github/copilot, antigravity.");
     if (normalized === "all") AGENT_ORDER.forEach((a) => selected.add(a));
     else selected.add(normalized);
   }
@@ -25279,11 +25282,12 @@ async function chooseAgentsForInit() {
   if (explicit) return normalizeAgents(explicit);
   if (args.includes("--no-interactive") || args.includes("--yes") || args.includes("-y") || !process.stdin.isTTY) return normalizeAgents("all");
   console.log("Ch\u1ECDn agent target \u0111\u1EC3 c\xE0i v\xE0o project:");
-  console.log("  1) all    - Codex/OpenAI + Claude Code + Cursor + GitHub Copilot");
+  console.log("  1) all    - Codex/OpenAI + Claude Code + Cursor + GitHub Copilot + Antigravity");
   console.log("  2) codex  - AGENTS.md + .codex prompts");
   console.log("  3) claude - CLAUDE.md + .claude/rules + b\u1EADt plugin fe trong .claude/settings.json");
   console.log("  4) cursor - .cursor rules");
   console.log("  5) github - GitHub Copilot instructions + PR template");
+  console.log("  6) antigravity - .agents/rules + .agents/skills (/fe-*)");
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
     const answer = await rl.question('Nh\u1EADp s\u1ED1/t\xEAn ho\u1EB7c danh s\xE1ch, v\xED d\u1EE5 "claude,codex" [all]: ');
@@ -25329,7 +25333,7 @@ function writeInstallManifest(target, agents) {
     "",
     "To add agents later:",
     "",
-    "node bin/fe-kit.mjs init --agents claude,codex,cursor,github",
+    "node bin/fe-kit.mjs init --agents claude,codex,cursor,github,antigravity",
     ""
   ].join("\n");
   fs11.writeFileSync(path12.join(target, ".frontend-delivery", "agents.md"), md);
@@ -25443,6 +25447,89 @@ ${body}`);
   }
   return files.length;
 }
+var ANTIGRAVITY_GENERATED_MARK = "<!-- fe-kit:generated (sinh t\u1EEB core/commands, s\u1EEDa \u1EDF kit r\u1ED3i ch\u1EA1y l\u1EA1i init) -->";
+function commandFrontmatterField(raw, name2) {
+  const fm = raw.match(/^---\n([\s\S]*?)\n---\n/);
+  const m2 = fm && fm[1].match(new RegExp("^" + name2 + ":\\s*(.*)$", "m"));
+  return m2 ? m2[1].trim().replace(/^"(.*)"$/, "$1") : "";
+}
+function writeAntigravityCommandSkills(target) {
+  const srcDir = path12.join(kitRoot, "core", "commands");
+  if (!fs11.existsSync(srcDir)) return 0;
+  const legacyDir = path12.join(target, ".agents", "workflows");
+  if (fs11.existsSync(legacyDir)) {
+    for (const old of fs11.readdirSync(legacyDir).filter((f) => /^fe-.*\.md$/.test(f))) fs11.rmSync(path12.join(legacyDir, old));
+    if (!fs11.readdirSync(legacyDir).length) fs11.rmdirSync(legacyDir);
+  }
+  const skillsDir = path12.join(target, ".agents", "skills");
+  fs11.mkdirSync(skillsDir, { recursive: true });
+  for (const dir of fs11.readdirSync(skillsDir).filter((d) => d.startsWith("fe-"))) {
+    const skillFile = path12.join(skillsDir, dir, "SKILL.md");
+    if (fs11.existsSync(skillFile) && fs11.readFileSync(skillFile, "utf8").includes(ANTIGRAVITY_GENERATED_MARK)) {
+      fs11.rmSync(path12.join(skillsDir, dir), { recursive: true, force: true });
+    }
+  }
+  const files = fs11.readdirSync(srcDir).filter((f) => f.endsWith(".md"));
+  for (const f of files) {
+    const cmd = f.replace(/\.md$/, "");
+    const raw = fs11.readFileSync(path12.join(srcDir, f), "utf8").replace(/\r\n/g, "\n");
+    const body = raw.replace(/^---\n[\s\S]*?\n---\n\n?/, "");
+    const hint = commandFrontmatterField(raw, "argument-hint");
+    const description = commandFrontmatterField(raw, "description") || `Ch\u1EA1y FE ${cmd}.`;
+    const lines = [
+      "---",
+      `name: fe-${cmd}`,
+      "description: " + JSON.stringify(`FE ${cmd}: ${description}`),
+      "---",
+      "",
+      ANTIGRAVITY_GENERATED_MARK,
+      "",
+      `# FE ${cmd}`,
+      "",
+      `G\u1ECDi: \`/fe-${cmd}${hint ? " " + hint : ""}\`. Ph\u1EA7n ng\u01B0\u1EDDi d\xF9ng g\xF5 sau l\u1EC7nh l\xE0 \`$ARGUMENTS\` trong h\u01B0\u1EDBng d\u1EABn b\xEAn d\u01B0\u1EDBi.` + // Chỉ nhắc MCP khi lệnh thật sự gọi tool fe_*; nhắc thừa làm agent đi tìm lệnh CLI không cần.
+      (/\bfe_[a-z]/.test(body) ? " Antigravity kh\xF4ng c\xF3 MCP tool `fe_*`: d\xF9ng l\u1EC7nh CLI t\u01B0\u01A1ng \u1EE9ng trong `.agents/rules/frontend-delivery-standard.md`." : "")
+    ];
+    if (COMMANDS.includes(cmd)) {
+      lines.push(
+        "",
+        `1. B\u1EAFt \u0111\u1EA7u: \`node bin/fe-kit.mjs mode begin <task-folder> ${cmd} --actor antigravity\`. Exit 1 l\xE0 b\u1ECB ch\u1EB7n: ch\u1EC9 c\u1EADp nh\u1EADt \`workflow-status.md\` theo prompt \u0111\u01B0\u1EE3c in ra r\u1ED3i d\u1EEBng.`,
+        `2. L\xE0m theo h\u01B0\u1EDBng d\u1EABn b\xEAn d\u01B0\u1EDBi.`,
+        `3. K\u1EBFt th\xFAc: \`node bin/fe-kit.mjs mode end <task-folder> ${cmd} --actor antigravity\`, x\u1EED l\xFD h\u1EBFt l\u1ED7i tr\u01B0\u1EDBc khi b\xE1o xong.`
+      );
+    }
+    lines.push("", body);
+    const dest = path12.join(skillsDir, `fe-${cmd}`, "SKILL.md");
+    fs11.mkdirSync(path12.dirname(dest), { recursive: true });
+    fs11.writeFileSync(dest, lines.join("\n"));
+  }
+  return files.length;
+}
+var ANTIGRAVITY_SKILL_NOTE = [
+  "## Ch\u1EA1y trong Antigravity",
+  "",
+  "Antigravity kh\xF4ng c\xF3 MCP tool `fe_*` v\xE0 hook c\u1EE7a kit. Khi skill n\xE0y nh\u1EAFc t\u1EDBi ch\xFAng:",
+  "",
+  "- Rule n\u1EB1m \u1EDF `.frontend-delivery/rules/`, template \u1EDF `.frontend-delivery/templates/` c\u1EE7a repo (kh\xF4ng c\xF3 th\u01B0 m\u1EE5c `rules/` c\u1EA1nh file skill n\xE0y).",
+  "- B\u1EAFt \u0111\u1EA7u mode: `node bin/fe-kit.mjs mode begin <task-folder> <mode> --actor antigravity` thay cho `fe_begin_mode`. Exit 1 l\xE0 b\u1ECB ch\u1EB7n: ch\u1EC9 c\u1EADp nh\u1EADt `workflow-status.md` r\u1ED3i d\u1EEBng.",
+  "- K\u1EBFt th\xFAc mode: `node bin/fe-kit.mjs mode end <task-folder> <mode> --actor antigravity` thay cho `fe_validate_workflow`/`fe_scope_diff`.",
+  "- C\xE1c tool kh\xE1c: xem b\u1EA3ng trong `.agents/rules/frontend-delivery-standard.md`. L\u1EC7nh mode g\u1ECDi b\u1EB1ng skill `/fe-<mode>`.",
+  ""
+].join("\n");
+function writeAntigravitySkill(target) {
+  const src = path12.join(kitRoot, "core", "SKILL.md");
+  if (!fs11.existsSync(src)) return false;
+  const raw = fs11.readFileSync(src, "utf8").replace(/\r\n/g, "\n");
+  const name2 = commandFrontmatterField(raw, "name") || "frontend-delivery-standard";
+  const fm = raw.match(/^---\n[\s\S]*?\n---\n/);
+  const head = fm ? fm[0] : "";
+  const body = raw.slice(head.length).replace(/^\n+/, "");
+  const firstHeading = body.match(/^# .*\n/);
+  const content = firstHeading ? head + "\n" + firstHeading[0] + "\n" + ANTIGRAVITY_SKILL_NOTE + "\n" + body.slice(firstHeading[0].length).replace(/^\n+/, "") : head + "\n" + ANTIGRAVITY_SKILL_NOTE + "\n" + body;
+  const dest = path12.join(target, ".agents", "skills", name2, "SKILL.md");
+  fs11.mkdirSync(path12.dirname(dest), { recursive: true });
+  fs11.writeFileSync(dest, content);
+  return true;
+}
 function marketplaceRepo() {
   const explicit = argValueFlexible("--marketplace-repo", "");
   if (explicit) return explicit;
@@ -25554,7 +25641,7 @@ async function init() {
     process.exit(1);
   }
   if (!agents.length) {
-    console.error("No agent target selected. Use --agents all, or one/more of: codex, claude, cursor, github.");
+    console.error("No agent target selected. Use --agents all, or one/more of: codex, claude, cursor, github, antigravity.");
     process.exit(1);
   }
   if (!fs11.existsSync(path12.join(kitRoot, "core", "adapters"))) {
@@ -25593,10 +25680,15 @@ async function init() {
   }
   if (agents.includes("cursor")) copyDir(adapterPath("cursor", ".cursor"), path12.join(target, ".cursor"));
   if (agents.includes("github")) copyDir(adapterPath("github", ".github"), path12.join(target, ".github"));
+  if (agents.includes("antigravity")) {
+    copyDir(adapterPath("antigravity", ".agents"), path12.join(target, ".agents"));
+    writeAntigravityCommandSkills(target);
+    writeAntigravitySkill(target);
+  }
   writeInstallManifest(target, agents);
   console.log("Frontend Delivery Agent Kit initialized in " + target);
   console.log("Installed agent targets: " + agentList(agents));
-  console.log("Next: edit docs/frontend-context/*.md and inspect .frontend-delivery/rules/, then run: node bin/fe-kit.mjs new-task FE-123-name --target <repo>");
+  console.log("Ti\u1EBFp theo: cho agent qu\xE9t source v\xE0 \u0111i\u1EC1n docs/frontend-context/*.md b\u1EB1ng FE context (/fe:context trong Claude Code, /fe-context trong Antigravity), \u0111\u1ECDc l\u1EA1i r\u1ED3i commit. Sau \u0111\xF3 giao vi\u1EC7c b\u1EB1ng FE task, ho\u1EB7c: node bin/fe-kit.mjs new-task FE-123-name --target <repo>");
 }
 function missingCommandPermissions(target) {
   let scripts;
@@ -25655,7 +25747,8 @@ function doctor() {
     codex: ["AGENTS.md", ".codex/README.md", ".codex/rules/frontend-delivery.md", ".codex/prompts/plan.md", ".codex/prompts/quick.md", ".codex/prompts/build.md", ".codex/prompts/figma-extract.md", ".codex/prompts/figma-review.md", ".codex/prompts/review.md"],
     claude: ["CLAUDE.md", ".claude/rules/frontend-delivery.md", ".claude/rules/frontend/task-folders.md", ".claude/rules/frontend/source-code.md"],
     cursor: [".cursor/rules/frontend-delivery-standard.mdc", ".cursor/rules/frontend-delivery-task.mdc", ".cursor/rules/frontend-delivery-code.mdc"],
-    github: [".github/copilot-instructions.md", ".github/instructions/frontend-task.instructions.md", ".github/instructions/frontend-review.instructions.md", ".github/pull_request_template.md"]
+    github: [".github/copilot-instructions.md", ".github/instructions/frontend-task.instructions.md", ".github/instructions/frontend-review.instructions.md", ".github/pull_request_template.md"],
+    antigravity: [".agents/rules/frontend-delivery-standard.md", ".agents/rules/frontend-delivery-task.md", ".agents/rules/frontend-delivery-code.md", ".agents/skills/frontend-delivery-standard/SKILL.md", ".agents/skills/fe-task/SKILL.md", ".agents/skills/fe-plan/SKILL.md", ".agents/skills/fe-quick/SKILL.md", ".agents/skills/fe-cook/SKILL.md", ".agents/skills/fe-review/SKILL.md", ".agents/skills/fe-pr/SKILL.md"]
   };
   const required2 = [...commonRequired, ...agents.flatMap((a) => requiredByAgent[a] || [])];
   let ok = true;
@@ -25692,7 +25785,7 @@ function doctor() {
     }
   }
   if (!ok) {
-    console.error("Doctor failed. Run: node bin/fe-kit.mjs init --target <repo> --agents <all|codex,claude,cursor,github>");
+    console.error("Doctor failed. Run: node bin/fe-kit.mjs init --target <repo> --agents <all|codex,claude,cursor,github,antigravity>");
     process.exit(strict ? 1 : 0);
   }
   console.log("Doctor passed. Selected Frontend Delivery Kit agent files are present.");
@@ -25958,7 +26051,7 @@ function modeCommand() {
   const [, action, taskInput, modeInput] = args;
   const command2 = normalizeCommand(modeInput || "");
   if (!["begin", "end"].includes(action) || !taskInput || !command2) {
-    console.error(`D\xF9ng: fe-kit mode begin|end <task> <mode> [--target repo] [--actor codex|cursor|copilot] [--no-log]
+    console.error(`D\xF9ng: fe-kit mode begin|end <task> <mode> [--target repo] [--actor codex|cursor|copilot|antigravity] [--no-log]
 Mode h\u1EE3p l\u1EC7: ${COMMANDS.join(", ")}.`);
     process.exit(1);
   }
@@ -26064,7 +26157,7 @@ Rules folder + plan input ledger + blocking question input-sync gate + scope dif
 
 Commands:
   # Agent prompt mode: FE quick <task> is available for small, low-risk localized changes. FE figma-review <task> is available for UI/Figma visual review.
-  init [--target repo] [--agents all|codex,claude,cursor,github]
+  init [--target repo] [--agents all|codex,claude,cursor,github,antigravity]
                                       Install selected agent adapters into repo. In a TTY, prompts for agent selection.
   doctor [--target repo] [--strict] [--agents ...]
                                       Check kit installation for selected/installed agents
@@ -26081,7 +26174,7 @@ Commands:
                                       Validate SRS/questions/plan/checklist/Figma gates
                                       (review/test/pr-ready: scope from git by default)
   mode begin <task> <mode> [--target] [--actor <tool>]
-                                      Gate l\xFAc v\xE0o mode + rule c\u1EE7a mode (cho Codex/Cursor/Copilot)
+                                      Gate l\xFAc v\xE0o mode + rule c\u1EE7a mode (cho Codex/Cursor/Copilot/Antigravity)
   mode end <task> <mode> [--target] [--base <ref>] [--actor <tool>]
                                       Gate k\u1EBFt th\xFAc mode, gi\u1ED1ng hook c\u1EE7a Claude Code
   retro [--since YYYY-MM-DD] [--date YYYY-MM-DD] [--json] [--write]

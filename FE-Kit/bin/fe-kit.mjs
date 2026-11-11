@@ -53,7 +53,7 @@ const PLUGIN_ID = 'fe@frontend-delivery';
 const MARKETPLACE_NAME = 'frontend-delivery';
 const args = process.argv.slice(2);
 const command = args[0] || 'help';
-const AGENT_ORDER = ['codex', 'claude', 'cursor', 'github'];
+const AGENT_ORDER = ['codex', 'claude', 'cursor', 'github', 'antigravity'];
 const AGENT_ALIASES = {
   all: 'all',
   everything: 'all',
@@ -67,13 +67,16 @@ const AGENT_ALIASES = {
   github: 'github',
   copilot: 'github',
   'github-copilot': 'github',
-  gh: 'github'
+  gh: 'github',
+  antigravity: 'antigravity',
+  'google-antigravity': 'antigravity'
 };
 const AGENT_LABELS = {
   codex: 'Codex / OpenAI coding agents',
   claude: 'Claude Code',
   cursor: 'Cursor',
-  github: 'GitHub Copilot'
+  github: 'GitHub Copilot',
+  antigravity: 'Google Antigravity'
 };
 
 function argValueFlexible(name, fallback = '') {
@@ -85,12 +88,12 @@ function argValueFlexible(name, fallback = '') {
 function normalizeAgents(raw) {
   const input = String(raw || '').trim();
   if (!input) return [];
-  const numberMap = { '1': 'all', '2': 'codex', '3': 'claude', '4': 'cursor', '5': 'github' };
+  const numberMap = { '1': 'all', '2': 'codex', '3': 'claude', '4': 'cursor', '5': 'github', '6': 'antigravity' };
   const tokens = input.split(/[,+\s]+/).map(t => t.trim().toLowerCase()).filter(Boolean).map(t => numberMap[t] || t);
   const selected = new Set();
   for (const token of tokens) {
     const normalized = AGENT_ALIASES[token];
-    if (!normalized) throw new Error('Unknown agent target: ' + token + '. Valid values: all, codex/openai, claude, cursor, github/copilot.');
+    if (!normalized) throw new Error('Unknown agent target: ' + token + '. Valid values: all, codex/openai, claude, cursor, github/copilot, antigravity.');
     if (normalized === 'all') AGENT_ORDER.forEach(a => selected.add(a));
     else selected.add(normalized);
   }
@@ -107,11 +110,12 @@ async function chooseAgentsForInit() {
   if (explicit) return normalizeAgents(explicit);
   if (args.includes('--no-interactive') || args.includes('--yes') || args.includes('-y') || !process.stdin.isTTY) return normalizeAgents('all');
   console.log('Chọn agent target để cài vào project:');
-  console.log('  1) all    - Codex/OpenAI + Claude Code + Cursor + GitHub Copilot');
+  console.log('  1) all    - Codex/OpenAI + Claude Code + Cursor + GitHub Copilot + Antigravity');
   console.log('  2) codex  - AGENTS.md + .codex prompts');
   console.log('  3) claude - CLAUDE.md + .claude/rules + bật plugin fe trong .claude/settings.json');
   console.log('  4) cursor - .cursor rules');
   console.log('  5) github - GitHub Copilot instructions + PR template');
+  console.log('  6) antigravity - .agents/rules + .agents/skills (/fe-*)');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
     const answer = await rl.question('Nhập số/tên hoặc danh sách, ví dụ "claude,codex" [all]: ');
@@ -156,7 +160,7 @@ function writeInstallManifest(target, agents) {
     '',
     'To add agents later:',
     '',
-    'node bin/fe-kit.mjs init --agents claude,codex,cursor,github',
+    'node bin/fe-kit.mjs init --agents claude,codex,cursor,github,antigravity',
     ''
   ].join('\n');
   fs.writeFileSync(path.join(target, '.frontend-delivery', 'agents.md'), md);
@@ -291,6 +295,111 @@ function writeCodexPrompts(target) {
   return files.length;
 }
 
+/** Đánh dấu skill do kit sinh, để init lại chỉ xoá/thay đúng các skill này. */
+const ANTIGRAVITY_GENERATED_MARK = '<!-- fe-kit:generated (sinh từ core/commands, sửa ở kit rồi chạy lại init) -->';
+
+/** Đọc một field một dòng trong frontmatter của command (`description`, `argument-hint`). */
+function commandFrontmatterField(raw, name) {
+  const fm = raw.match(/^---\n([\s\S]*?)\n---\n/);
+  const m = fm && fm[1].match(new RegExp('^' + name + ':\\s*(.*)$', 'm'));
+  return m ? m[1].trim().replace(/^"(.*)"$/, '$1') : '';
+}
+
+/**
+ * Sinh skill .agents/skills/fe-<cmd>/SKILL.md từ core/commands cho Antigravity; Antigravity tự biến
+ * mỗi skill thành lệnh `/fe-<cmd>` (workflow `.agents/workflows/` đã bị Antigravity deprecate).
+ * Chỉ xoá/thay skill có dấu ANTIGRAVITY_GENERATED_MARK, giữ skill riêng của team. Workflow fe-*.md
+ * do bản adapter trước sinh ra được dọn đi để không trùng lệnh.
+ */
+function writeAntigravityCommandSkills(target) {
+  const srcDir = path.join(kitRoot, 'core', 'commands');
+  if (!fs.existsSync(srcDir)) return 0;
+  const legacyDir = path.join(target, '.agents', 'workflows');
+  if (fs.existsSync(legacyDir)) {
+    for (const old of fs.readdirSync(legacyDir).filter((f) => /^fe-.*\.md$/.test(f))) fs.rmSync(path.join(legacyDir, old));
+    if (!fs.readdirSync(legacyDir).length) fs.rmdirSync(legacyDir);
+  }
+  const skillsDir = path.join(target, '.agents', 'skills');
+  fs.mkdirSync(skillsDir, { recursive: true });
+  for (const dir of fs.readdirSync(skillsDir).filter((d) => d.startsWith('fe-'))) {
+    const skillFile = path.join(skillsDir, dir, 'SKILL.md');
+    if (fs.existsSync(skillFile) && fs.readFileSync(skillFile, 'utf8').includes(ANTIGRAVITY_GENERATED_MARK)) {
+      fs.rmSync(path.join(skillsDir, dir), { recursive: true, force: true });
+    }
+  }
+  const files = fs.readdirSync(srcDir).filter((f) => f.endsWith('.md'));
+  for (const f of files) {
+    const cmd = f.replace(/\.md$/, '');
+    const raw = fs.readFileSync(path.join(srcDir, f), 'utf8').replace(/\r\n/g, '\n');
+    const body = raw.replace(/^---\n[\s\S]*?\n---\n\n?/, '');
+    const hint = commandFrontmatterField(raw, 'argument-hint');
+    const description = commandFrontmatterField(raw, 'description') || `Chạy FE ${cmd}.`;
+    const lines = [
+      '---',
+      `name: fe-${cmd}`,
+      'description: ' + JSON.stringify(`FE ${cmd}: ${description}`),
+      '---',
+      '',
+      ANTIGRAVITY_GENERATED_MARK,
+      '',
+      `# FE ${cmd}`,
+      '',
+      `Gọi: \`/fe-${cmd}${hint ? ' ' + hint : ''}\`. Phần người dùng gõ sau lệnh là \`$ARGUMENTS\` trong hướng dẫn bên dưới.` +
+        // Chỉ nhắc MCP khi lệnh thật sự gọi tool fe_*; nhắc thừa làm agent đi tìm lệnh CLI không cần.
+        (/\bfe_[a-z]/.test(body)
+          ? ' Antigravity không có MCP tool `fe_*`: dùng lệnh CLI tương ứng trong `.agents/rules/frontend-delivery-standard.md`.'
+          : '')
+    ];
+    if (COMMANDS.includes(cmd)) {
+      lines.push(
+        '',
+        `1. Bắt đầu: \`node bin/fe-kit.mjs mode begin <task-folder> ${cmd} --actor antigravity\`. Exit 1 là bị chặn: chỉ cập nhật \`workflow-status.md\` theo prompt được in ra rồi dừng.`,
+        `2. Làm theo hướng dẫn bên dưới.`,
+        `3. Kết thúc: \`node bin/fe-kit.mjs mode end <task-folder> ${cmd} --actor antigravity\`, xử lý hết lỗi trước khi báo xong.`
+      );
+    }
+    lines.push('', body);
+    const dest = path.join(skillsDir, `fe-${cmd}`, 'SKILL.md');
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, lines.join('\n'));
+  }
+  return files.length;
+}
+
+const ANTIGRAVITY_SKILL_NOTE = [
+  '## Chạy trong Antigravity',
+  '',
+  'Antigravity không có MCP tool `fe_*` và hook của kit. Khi skill này nhắc tới chúng:',
+  '',
+  '- Rule nằm ở `.frontend-delivery/rules/`, template ở `.frontend-delivery/templates/` của repo (không có thư mục `rules/` cạnh file skill này).',
+  '- Bắt đầu mode: `node bin/fe-kit.mjs mode begin <task-folder> <mode> --actor antigravity` thay cho `fe_begin_mode`. Exit 1 là bị chặn: chỉ cập nhật `workflow-status.md` rồi dừng.',
+  '- Kết thúc mode: `node bin/fe-kit.mjs mode end <task-folder> <mode> --actor antigravity` thay cho `fe_validate_workflow`/`fe_scope_diff`.',
+  '- Các tool khác: xem bảng trong `.agents/rules/frontend-delivery-standard.md`. Lệnh mode gọi bằng skill `/fe-<mode>`.',
+  ''
+].join('\n');
+
+/**
+ * Cài skill frontend-delivery-standard vào .agents/skills/ cho Antigravity: nội dung lấy từ
+ * core/SKILL.md, chèn thêm đoạn hướng dẫn chạy không có MCP ngay sau frontmatter.
+ */
+function writeAntigravitySkill(target) {
+  const src = path.join(kitRoot, 'core', 'SKILL.md');
+  if (!fs.existsSync(src)) return false;
+  const raw = fs.readFileSync(src, 'utf8').replace(/\r\n/g, '\n');
+  const name = commandFrontmatterField(raw, 'name') || 'frontend-delivery-standard';
+  const fm = raw.match(/^---\n[\s\S]*?\n---\n/);
+  const head = fm ? fm[0] : '';
+  const body = raw.slice(head.length).replace(/^\n+/, '');
+  const firstHeading = body.match(/^# .*\n/);
+  const content = firstHeading
+    ? head + '\n' + firstHeading[0] + '\n' + ANTIGRAVITY_SKILL_NOTE + '\n' + body.slice(firstHeading[0].length).replace(/^\n+/, '')
+    : head + '\n' + ANTIGRAVITY_SKILL_NOTE + '\n' + body;
+  const dest = path.join(target, '.agents', 'skills', name, 'SKILL.md');
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, content);
+  return true;
+}
+
 function marketplaceRepo() {
   const explicit = argValueFlexible('--marketplace-repo', '');
   if (explicit) return explicit;
@@ -420,7 +529,7 @@ async function init() {
     process.exit(1);
   }
   if (!agents.length) {
-    console.error('No agent target selected. Use --agents all, or one/more of: codex, claude, cursor, github.');
+    console.error('No agent target selected. Use --agents all, or one/more of: codex, claude, cursor, github, antigravity.');
     process.exit(1);
   }
 
@@ -468,11 +577,16 @@ async function init() {
   }
   if (agents.includes('cursor')) copyDir(adapterPath('cursor', '.cursor'), path.join(target, '.cursor'));
   if (agents.includes('github')) copyDir(adapterPath('github', '.github'), path.join(target, '.github'));
+  if (agents.includes('antigravity')) {
+    copyDir(adapterPath('antigravity', '.agents'), path.join(target, '.agents'));
+    writeAntigravityCommandSkills(target);
+    writeAntigravitySkill(target);
+  }
 
   writeInstallManifest(target, agents);
   console.log('Frontend Delivery Agent Kit initialized in ' + target);
   console.log('Installed agent targets: ' + agentList(agents));
-  console.log('Next: edit docs/frontend-context/*.md and inspect .frontend-delivery/rules/, then run: node bin/fe-kit.mjs new-task FE-123-name --target <repo>');
+  console.log('Tiếp theo: cho agent quét source và điền docs/frontend-context/*.md bằng FE context (/fe:context trong Claude Code, /fe-context trong Antigravity), đọc lại rồi commit. Sau đó giao việc bằng FE task, hoặc: node bin/fe-kit.mjs new-task FE-123-name --target <repo>');
 }
 
 /**
@@ -533,7 +647,8 @@ function doctor() {
     codex: ['AGENTS.md','.codex/README.md','.codex/rules/frontend-delivery.md','.codex/prompts/plan.md','.codex/prompts/quick.md','.codex/prompts/build.md','.codex/prompts/figma-extract.md','.codex/prompts/figma-review.md','.codex/prompts/review.md'],
     claude: ['CLAUDE.md','.claude/rules/frontend-delivery.md','.claude/rules/frontend/task-folders.md','.claude/rules/frontend/source-code.md'],
     cursor: ['.cursor/rules/frontend-delivery-standard.mdc','.cursor/rules/frontend-delivery-task.mdc','.cursor/rules/frontend-delivery-code.mdc'],
-    github: ['.github/copilot-instructions.md','.github/instructions/frontend-task.instructions.md','.github/instructions/frontend-review.instructions.md','.github/pull_request_template.md']
+    github: ['.github/copilot-instructions.md','.github/instructions/frontend-task.instructions.md','.github/instructions/frontend-review.instructions.md','.github/pull_request_template.md'],
+    antigravity: ['.agents/rules/frontend-delivery-standard.md','.agents/rules/frontend-delivery-task.md','.agents/rules/frontend-delivery-code.md','.agents/skills/frontend-delivery-standard/SKILL.md','.agents/skills/fe-task/SKILL.md','.agents/skills/fe-plan/SKILL.md','.agents/skills/fe-quick/SKILL.md','.agents/skills/fe-cook/SKILL.md','.agents/skills/fe-review/SKILL.md','.agents/skills/fe-pr/SKILL.md']
   };
   const required = [...commonRequired, ...agents.flatMap(a => requiredByAgent[a] || [])];
   let ok = true;
@@ -576,7 +691,7 @@ function doctor() {
     }
   }
   if (!ok) {
-    console.error('Doctor failed. Run: node bin/fe-kit.mjs init --target <repo> --agents <all|codex,claude,cursor,github>');
+    console.error('Doctor failed. Run: node bin/fe-kit.mjs init --target <repo> --agents <all|codex,claude,cursor,github,antigravity>');
     process.exit(strict ? 1 : 0);
   }
   console.log('Doctor passed. Selected Frontend Delivery Kit agent files are present.');
@@ -800,7 +915,7 @@ function validatePrLean() {
   console.log(nextStepHint(taskDir));
 }
 
-// --- Run-log, mode begin/end cho adapter không có hook (Codex, Cursor, Copilot) ---
+// --- Run-log, mode begin/end cho adapter không có hook (Codex, Cursor, Copilot, Antigravity) ---
 
 function cliActor() {
   return argValueFlexible('--actor', '') || process.env.FE_KIT_ACTOR || 'cli';
@@ -850,7 +965,7 @@ function modeCommand() {
   const [, action, taskInput, modeInput] = args;
   const command = normalizeCommand(modeInput || '');
   if (!['begin', 'end'].includes(action) || !taskInput || !command) {
-    console.error(`Dùng: fe-kit mode begin|end <task> <mode> [--target repo] [--actor codex|cursor|copilot] [--no-log]\nMode hợp lệ: ${COMMANDS.join(', ')}.`);
+    console.error(`Dùng: fe-kit mode begin|end <task> <mode> [--target repo] [--actor codex|cursor|copilot|antigravity] [--no-log]\nMode hợp lệ: ${COMMANDS.join(', ')}.`);
     process.exit(1);
   }
   const taskDir = resolveTask(taskInput, target);
@@ -952,7 +1067,7 @@ function retro() {
 }
 
 function help() {
-  console.log(`Frontend Delivery Agent Kit CLI v${readKitVersion()}\nRules folder + plan input ledger + blocking question input-sync gate + scope diff tính từ git + command evidence trước PR.\n\nCommands:\n  # Agent prompt mode: FE quick <task> is available for small, low-risk localized changes. FE figma-review <task> is available for UI/Figma visual review.\n  init [--target repo] [--agents all|codex,claude,cursor,github]\n                                      Install selected agent adapters into repo. In a TTY, prompts for agent selection.\n  doctor [--target repo] [--strict] [--agents ...]\n                                      Check kit installation for selected/installed agents\n  new-task <slug> [--target repo]       Create standard FE task folder\n  status <task> [--target repo]         Show current step, blockers, checklist summary\n  next <task> [--target repo]           Print Prompt bước tiếp theo from workflow-status.md\n  validate-task <task> [--target repo]  Validate standard task structure and workflow rules\n  validate-pr <task> [--target repo] [--base ref] [--no-scope]\n                                      Validate PR readiness; so git diff với bảng file trong plan\n  validate-pr --orphans [--target repo] [--base ref]\n                                      File source đã đổi mà không task nào khai trong plan\n                                      (mức: require_task_for_source trong .frontend-delivery/standard.yaml)\n  validate-workflow <task> [--target] [--base <ref>] [--scope|--no-scope]\n                                      Validate SRS/questions/plan/checklist/Figma gates\n                                      (review/test/pr-ready: scope from git by default)\n  mode begin <task> <mode> [--target] [--actor <tool>]\n                                      Gate lúc vào mode + rule của mode (cho Codex/Cursor/Copilot)\n  mode end <task> <mode> [--target] [--base <ref>] [--actor <tool>]\n                                      Gate kết thúc mode, giống hook của Claude Code\n  retro [--since YYYY-MM-DD] [--date YYYY-MM-DD] [--json] [--write]\n                                      Số liệu retro (run-log + bug theo nhóm/nguyên nhân gốc)\n  retro check <dir> | retro export <dir>\n                                      Kiểm thư mục retro / xuất đề xuất upstream đã duyệt\n  report [<task>] [--target] [--since YYYY-MM-DD] [--json]\n                                      Tổng hợp tracking/run-log.jsonl của các task\n                                      (validate-*/mode ghi run-log; tắt bằng --no-log, CI=true tự tắt)\n  check-srs-reference <task> [--target] Validate task.md SRS/API maps\n  check-questions-routing <task> [--target] Validate questions.md routing sections/owners\n  check-plan-architecture <task> [--target] Validate frontend logic architecture plan sections\n  check-plan-checklist-sync <task> [--target] Validate checklist mirrors plan file/hook/store decisions\n  check-input-sync-report <task> [--target] Validate tracking/input-sync-report.md when input sync is active\n  check-figma-evidence <task> [--target] Validate Figma summary, screenshots, and MCP/API evidence\n  check-asset-gate <task> [--target]     Validate embedded Asset Extraction Log\n`);
+  console.log(`Frontend Delivery Agent Kit CLI v${readKitVersion()}\nRules folder + plan input ledger + blocking question input-sync gate + scope diff tính từ git + command evidence trước PR.\n\nCommands:\n  # Agent prompt mode: FE quick <task> is available for small, low-risk localized changes. FE figma-review <task> is available for UI/Figma visual review.\n  init [--target repo] [--agents all|codex,claude,cursor,github,antigravity]\n                                      Install selected agent adapters into repo. In a TTY, prompts for agent selection.\n  doctor [--target repo] [--strict] [--agents ...]\n                                      Check kit installation for selected/installed agents\n  new-task <slug> [--target repo]       Create standard FE task folder\n  status <task> [--target repo]         Show current step, blockers, checklist summary\n  next <task> [--target repo]           Print Prompt bước tiếp theo from workflow-status.md\n  validate-task <task> [--target repo]  Validate standard task structure and workflow rules\n  validate-pr <task> [--target repo] [--base ref] [--no-scope]\n                                      Validate PR readiness; so git diff với bảng file trong plan\n  validate-pr --orphans [--target repo] [--base ref]\n                                      File source đã đổi mà không task nào khai trong plan\n                                      (mức: require_task_for_source trong .frontend-delivery/standard.yaml)\n  validate-workflow <task> [--target] [--base <ref>] [--scope|--no-scope]\n                                      Validate SRS/questions/plan/checklist/Figma gates\n                                      (review/test/pr-ready: scope from git by default)\n  mode begin <task> <mode> [--target] [--actor <tool>]\n                                      Gate lúc vào mode + rule của mode (cho Codex/Cursor/Copilot/Antigravity)\n  mode end <task> <mode> [--target] [--base <ref>] [--actor <tool>]\n                                      Gate kết thúc mode, giống hook của Claude Code\n  retro [--since YYYY-MM-DD] [--date YYYY-MM-DD] [--json] [--write]\n                                      Số liệu retro (run-log + bug theo nhóm/nguyên nhân gốc)\n  retro check <dir> | retro export <dir>\n                                      Kiểm thư mục retro / xuất đề xuất upstream đã duyệt\n  report [<task>] [--target] [--since YYYY-MM-DD] [--json]\n                                      Tổng hợp tracking/run-log.jsonl của các task\n                                      (validate-*/mode ghi run-log; tắt bằng --no-log, CI=true tự tắt)\n  check-srs-reference <task> [--target] Validate task.md SRS/API maps\n  check-questions-routing <task> [--target] Validate questions.md routing sections/owners\n  check-plan-architecture <task> [--target] Validate frontend logic architecture plan sections\n  check-plan-checklist-sync <task> [--target] Validate checklist mirrors plan file/hook/store decisions\n  check-input-sync-report <task> [--target] Validate tracking/input-sync-report.md when input sync is active\n  check-figma-evidence <task> [--target] Validate Figma summary, screenshots, and MCP/API evidence\n  check-asset-gate <task> [--target]     Validate embedded Asset Extraction Log\n`);
 }
 
 

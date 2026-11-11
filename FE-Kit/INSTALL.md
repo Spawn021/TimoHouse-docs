@@ -8,7 +8,7 @@ Repo chính thức: [`Truong2/FE-Kit`](https://github.com/Truong2/FE-Kit). Marke
 
 ## 1. Claude Code plugin (khuyến nghị cho team dùng Claude Code)
 
-Cài 1 lần, tự động có: skill `frontend-delivery-standard`, 12 slash command, 7 subagent.
+Cài 1 lần, tự động có: skill `frontend-delivery-standard`, 14 slash command, 7 subagent.
 
 ### Chọn phạm vi cài: tất cả dự án hay chỉ 1 dự án?
 
@@ -203,6 +203,7 @@ Với adapter Claude, `init` chỉ ghi cấu hình marketplace/plugin vào `.cla
 | Codex | `codex` | `AGENTS.md`, `.codex/rules/`, `.codex/prompts/` (sinh từ `core/commands`) |
 | Cursor | `cursor` | `.cursor/rules/*.mdc` |
 | GitHub Copilot | `github` | `.github/copilot-instructions.md`, `.github/instructions/`, PR template, workflow validate task |
+| Google Antigravity | `antigravity` | `.agents/rules/*.md` (rule chung `always_on`, rule task và source theo glob), skill `.agents/skills/fe-<mode>/SKILL.md` cho từng lệnh (sinh từ `core/commands`, gọi bằng `/fe-<mode>`), skill chung `.agents/skills/frontend-delivery-standard/` |
 
 Từ v2.0.0 `--agents claude` **không** copy commands/agents/skill nữa — chúng đến từ plugin. Repo đã init bằng v1.x còn `.claude/commands/fe/`, `.claude/agents/frontend-*.md`, `.claude/skills/frontend-delivery-standard/` thì xoá đi; `doctor` báo `TRÙNG` cho đến khi xoá xong.
 
@@ -222,7 +223,7 @@ Từ v2.0.0 `--agents claude` **không** copy commands/agents/skill nữa — ch
 |---|---|
 | Chỉ cần slash command + skill trong Claude Code | Cách 1 |
 | Cần tạo task folder, chạy gate, CI | Cách 1 + 2 |
-| Team dùng Cursor/Copilot/Codex | Cách 2 + 3 |
+| Team dùng Cursor/Copilot/Codex/Antigravity | Cách 2 + 3 |
 | Toàn bộ, nhiều agent | Cách 2 với `--agents all`; thêm cách 1 trên mỗi máy dùng Claude |
 
 Và trong cách 1, chọn phạm vi:

@@ -20,6 +20,8 @@ Cache marker: `vi-diacritics-rules-folder-v1.0.0`
 
 ## Bắt đầu một yêu cầu mới (Task-first)
 
+Repo vừa cài kit, `docs/frontend-context/` còn trống hoặc stack đã đổi: chạy `FE context [ghi chú]` trước. Lệnh quét source, điền stack, lệnh chạy, quy ước thư mục, design system và đề xuất feature mẫu; điểm không chắc ghi vào mục "Cần xác nhận" để team duyệt.
+
 Yêu cầu frontend mới bằng ngôn ngữ tự nhiên, chưa có task folder: dùng `FE task <yêu cầu>`. Lệnh này phân loại loại task (`task_type`), mức rủi ro (`risk_level`), tạo task folder và route sang `FE quick` (0 tín hiệu phức tạp) hoặc `FE plan` (≥ 1 tín hiệu); luôn in bảng phân loại và cho người dùng override. Task cần Figma hoặc `risk_level: high` bị gate chặn `FE quick` (ENTRY_QUICK_FIGMA_REQUIRED, ENTRY_QUICK_HIGH_RISK). Phân loại route nhẹ bị vượt scope thì chuyển `FE plan`/`FE input-sync` trên cùng task folder, không tạo task mới.
 
 ## Bắt đầu và kết thúc một mode
@@ -37,12 +39,14 @@ Môi trường không có MCP tool của kit (ChatGPT, Codex, Cursor, Copilot): 
 
 ## Rule loading theo mode
 
-- Luôn: `rules/core.md`, `rules/mode-output-contract.md`, `rules/plan-input-ledger-contract.md`, `rules/question-resolution-contract.md`, `rules/vietnamese-output.md`, `rules/efficiency-budget-contract.md`
-- SRS/API: `rules/srs-api-contract.md`
-- UI/Figma: `rules/figma-ui-contract.md`
-- Cook/review/quick/bugfix: `rules/clean-code-contract.md`
-- Cook/review/test/figma-review/pr: `rules/evidence-scope-contract.md`
-- Review/bugfix/PR: `rules/review-bug-contract.md`
+Khớp với `rules` trong `pack.yaml` của kit (nguồn mà `fe_begin_mode` và `fe-kit mode begin` dùng):
+
+- Luôn (mọi mode): `rules/core.md`, `rules/mode-output-contract.md`, `rules/plan-input-ledger-contract.md`, `rules/question-resolution-contract.md`, `rules/vietnamese-output.md`, `rules/efficiency-budget-contract.md`, `rules/untrusted-input-contract.md`
+- `plan`, `input-sync`, `cook`, `quick`, `bugfix`, `review`: `rules/srs-api-contract.md`
+- `cook`, `quick`, `bugfix`, `review`: `rules/clean-code-contract.md`
+- `cook`, `review`, `test`, `figma-review`, `pr`: `rules/evidence-scope-contract.md`
+- `review`, `bugfix`, `pr`: `rules/review-bug-contract.md`
+- `figma`, `figma-review`; và `plan`, `cook`, `quick`, `bugfix`, `review`, `pr` khi `figma_required: true`: `rules/figma-ui-contract.md`
 
 ## Project context chuẩn
 

@@ -1,6 +1,6 @@
 # Frontend Delivery Agent Kit
 
-Bộ chuẩn frontend delivery tiếng Việt cho ChatGPT Skill, Claude Code, Codex, Cursor và GitHub Copilot. Kit chỉ dành cho domain frontend.
+Bộ chuẩn frontend delivery tiếng Việt cho ChatGPT Skill, Claude Code, Codex, Cursor, GitHub Copilot và Google Antigravity. Kit chỉ dành cho domain frontend.
 
 Một task đi theo luồng plan → (input-sync khi còn câu hỏi) → cook → review → bugfix → test → pr. Mỗi bước có gate kiểm bằng code, ghi run-log và để lại artifact trong `docs/frontend-tasks/<task>/`. Định kỳ, `/fe:retro` tổng hợp run-log và bug thành đề xuất cải tiến rule để team duyệt.
 
@@ -26,7 +26,7 @@ Máy dùng kit cần Git, Node.js từ `18.17` trở lên để chạy CLI/MCP/h
 
 ### Cách 1 — Claude Code plugin (khuyến nghị cho team dùng Claude Code)
 
-Cài plugin để có skill `frontend-delivery-standard`, 13 slash command, 7 subagent, MCP server validator và hook kiểm tra gate lúc chạy. Hook mặc định chỉ cảnh báo. Cơ chế chi tiết: [ARCHITECTURE.md](ARCHITECTURE.md).
+Cài plugin để có skill `frontend-delivery-standard`, 14 slash command, 7 subagent, MCP server validator và hook kiểm tra gate lúc chạy. Hook mặc định chỉ cảnh báo. Cơ chế chi tiết: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 **Dùng cho tất cả dự án trên máy bạn** — chạy trong terminal (scope `user`):
 
@@ -100,10 +100,12 @@ node bin/fe-kit.mjs doctor --strict
 Từ thư mục `FE-Kit`, chọn adapter cần dùng:
 
 ```bash
-node standalone/fe-kit.mjs init --target ../du-an-frontend --agents codex,cursor,github
+node standalone/fe-kit.mjs init --target ../du-an-frontend --agents codex,cursor,github,antigravity
 ```
 
-Codex, Cursor và Copilot không có hook, nên agent gọi CLI ở đầu và cuối mỗi mode (hướng dẫn đã nằm trong adapter):
+Với Antigravity, init ghi rule vào `.agents/rules/` và mỗi lệnh thành một skill `.agents/skills/fe-<mode>/SKILL.md` (gọi bằng `/fe-task`, `/fe-plan`, `/fe-cook`…), sinh từ `core/commands/`, kèm skill chung `frontend-delivery-standard`; skill, rule và workflow riêng của team được giữ nguyên.
+
+Codex, Cursor, Copilot và Antigravity không có hook, nên agent gọi CLI ở đầu và cuối mỗi mode (hướng dẫn đã nằm trong adapter):
 
 ```bash
 node bin/fe-kit.mjs mode begin docs/frontend-tasks/FE-123-abc cook   # gate lúc vào mode + rule của mode
@@ -117,7 +119,7 @@ ChatGPT Skill: cài dependency trong repo `FE-Kit` bằng `npm ci`, chạy `npm 
 ```text
 core/                     # NGUỒN DUY NHẤT — sửa ở đây
   SKILL.md                # skill frontend-delivery-standard
-  commands/               # 12 slash command (generator chèn đoạn delegation cho plugin)
+  commands/               # 14 slash command (generator chèn đoạn delegation cho plugin)
   agents/                 # 7 subagent + _protocol.md dùng chung
   hooks/                  # hook runtime (bundle) + hooks.json
   mcp/server.mjs          # MCP server: 10 tool fe_begin_mode, fe_validate_*, fe_scope_diff, fe_retro_data...
@@ -196,6 +198,7 @@ Mọi mode phải cập nhật artifact bắt buộc và `tracking/workflow-stat
 
 Lệnh cấp repo, không thuộc task nào:
 
+- `FE context [ghi chú]` (`/fe:context`): chạy inline, quét source và điền `docs/frontend-context/` (stack, lệnh chạy, quy ước thư mục, design system, đề xuất feature mẫu). Mỗi giá trị kèm path làm bằng chứng, điểm không chắc vào mục "Cần xác nhận", giữ nguyên ô team đã điền, không sửa source. Chạy một lần sau khi cài kit hoặc khi stack đổi.
 - `FE retro [--since YYYY-MM-DD]` (`/fe:retro`): agent `frontend-retro-analyst` đọc số liệu run-log và bug của các task, viết `retro-report.md` và `proposals.md`. Agent chỉ được ghi đề xuất ở trạng thái `Proposed`. Chuyển sang `Approved`/`Applied` hay sửa `team-rules.md` đều phải người dùng xác nhận. Đề xuất cho kit được xuất thành nội dung issue (`fe-kit retro export`); kit không tự sửa rule lõi.
 
 ## Gate và evidence

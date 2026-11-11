@@ -21,7 +21,7 @@ claude plugin marketplace add your-org/frontend-delivery-agent-kit --scope proje
 claude plugin install fe@frontend-delivery --scope project
 ```
 
-Cài xong là có 13 command namespace `fe`. Cách dùng đơn giản nhất — giao yêu cầu bằng ngôn ngữ tự nhiên, router tự phân loại, tạo task và chạy tiếp:
+Cài xong là có 14 command namespace `fe`. Lần đầu dùng trong repo, chạy `/fe:context` để agent quét source và điền `docs/frontend-context/`. Cách dùng đơn giản nhất — giao yêu cầu bằng ngôn ngữ tự nhiên, router tự phân loại, tạo task và chạy tiếp:
 
 ```text
 /fe:task Thêm nút export CSV vào bảng đơn hàng, API đã có sẵn
