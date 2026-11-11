@@ -1,0 +1,49 @@
+name: Kit CI
+
+# CI cho CHÍNH repo kit này (test validators/hook/CLI + kiểm tra core/ đã
+# đồng bộ với các bản generate). KHÔNG nhầm với
+# `core/adapters/github/.github/workflows/frontend-delivery-standard.yml` —
+# file đó là template được `fe-kit init --agents github` copy vào project
+# của team dùng kit.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-and-build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (npm workspaces)
+        run: npm ci
+
+      - name: Kiểm tra core/ đã đồng bộ với mọi bản generate (build:check)
+        run: npm run build:check
+
+      - name: Test validators, hook runtime và CLI bundle (Vitest)
+        run: npm test
+
+      - name: Validate plugin và marketplace manifest
+        run: |
+          npx -y @anthropic-ai/claude-code plugin validate ./plugins/fe --strict
+          npx -y @anthropic-ai/claude-code plugin validate .
+
+      - name: CLI smoke test — init + doctor + new-task + validate trên repo tạm (CLI bundle, không node_modules)
+        run: |
+          set -e
+          TMP_REPO=$(mktemp -d)
+          git init -q "$TMP_REPO"
+          node standalone/fe-kit.mjs init --target "$TMP_REPO" --agents all --yes
+          cd "$TMP_REPO"
+          node bin/fe-kit.mjs doctor --strict
+          node bin/fe-kit.mjs new-task FE-ci-smoke-test
+          node bin/fe-kit.mjs validate-task FE-ci-smoke-test
+          node bin/fe-kit.mjs validate-workflow docs/frontend-tasks/FE-ci-smoke-test

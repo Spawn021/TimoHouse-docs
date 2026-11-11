@@ -1,0 +1,22 @@
+{
+  "name": "timohouse-mockup",
+  "private": true,
+  "version": "3.0.0",
+  "description": "TimoHouse – mockup tương tác (static SPA, vanilla JS). Build = copy mockup/ → dist/ kèm cache-busting cho Netlify.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "dev:dist": "node scripts/serve.mjs --dist",
+    "check": "node scripts/build.mjs --check-only",
+    "build": "node scripts/build.mjs",
+    "zip": "npm run build && tar -a -c -f timohouse-mockup.zip -C dist .",
+    "walkthrough:p1": "node scripts/capture_phase1_walkthrough.mjs"
+  },
+  "devDependencies": {
+    "docx": "^9.7.1",
+    "playwright-core": "^1.63.0"
+  }
+}

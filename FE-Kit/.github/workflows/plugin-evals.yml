@@ -1,0 +1,109 @@
+name: Plugin behaviour evals
+
+# Eval hành vi của plugin `fe`: delegation, gate câu hỏi blocking, không sửa
+# source sai vai, gate bị lọt (evidence giả, file ngoài plan) và chặn nhầm.
+# Tốn chi phí API nên chỉ chạy tay. Cần secret ANTHROPIC_API_KEY.
+#
+# Profile (định nghĩa ở evals/profiles.mjs, rẻ → đắt):
+#   pilot  Sonnet, 1 case × 1 lần, trần 1 USD — đo chi phí thật của một lượt
+#   smoke  Sonnet, mọi case × 1 lần, trần 5 USD — kiểm scaffold và grader
+#   gate   Opus, case gate × 3 lần × warn + enforce, trần 10 USD/mức — áp luật enforce
+#   full   Opus, mọi case × 5 lần ở warn, case gate × 5 lần ở enforce — trước release
+#
+# Chạy trên máy (dùng tài khoản claude đang đăng nhập): `npm run eval:pilot` …
+#
+# Profile gate/full ghi baseline: tải artifact `eval-baselines`, chép vào
+# evals/baselines/ và commit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Mức chạy (xem evals/profiles.mjs)
+        type: choice
+        options: [pilot, smoke, gate, full]
+        default: pilot
+      model:
+        description: Đổi model chạy agent (để trống = model mặc định của profile)
+        default: ""
+
+jobs:
+  levels:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.levels.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - id: levels
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: echo "matrix=$(node evals/run.mjs "$PROFILE" --print-levels)" >> "$GITHUB_OUTPUT"
+
+  evals:
+    needs: levels
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        level: ${{ fromJSON(needs.levels.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cài Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Chạy eval (hook ${{ matrix.level }})
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PROFILE: ${{ inputs.profile }}
+          MODEL: ${{ inputs.model }}
+          LEVEL: ${{ matrix.level }}
+        # run.mjs đặt EVAL_FE_KIT_HOOKS (plugin eval chỉ chuyển biến EVAL_* vào phiên).
+        run: node evals/run.mjs "$PROFILE" --level "$LEVEL" ${MODEL:+--model "$MODEL"}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: plugin-eval-${{ matrix.level }}
+          path: |
+            evals/results/
+            evals/baselines/*/*.json
+          if-no-files-found: ignore
+
+  baseline:
+    needs: evals
+    if: always() && (inputs.profile == 'gate' || inputs.profile == 'full')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: plugin-eval-*
+          path: artifacts
+
+      - name: Gộp baseline và áp luật enforce
+        run: |
+          mkdir -p evals/baselines
+          for dir in artifacts/*/evals/baselines; do
+            [ -d "$dir" ] && cp -R "$dir/." evals/baselines/
+          done
+          node evals/summarize.mjs --readme-only
+          cat evals/baselines/README.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-baselines
+          path: evals/baselines/

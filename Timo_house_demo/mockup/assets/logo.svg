@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TimoHouse">
+  <defs>
+    <linearGradient id="house-gradient" x1="8" y1="8" x2="55" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9BE7FF"/>
+      <stop offset=".48" stop-color="#54C8FF"/>
+      <stop offset="1" stop-color="#2595F4"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#house-gradient)" d="M28.1 6.7a5.8 5.8 0 0 1 7.8 0l24 21.8a5.7 5.7 0 0 1-7.6 8.5l-2.8-2.5V52a8 8 0 0 1-8 8h-19a8 8 0 0 1-8-8V34.5L11.7 37a5.7 5.7 0 1 1-7.6-8.5l24-21.8Z"/>
+  <path fill="#0B4A87" d="M27 60V41.5a5 5 0 0 1 10 0v6.1c0 1.9 1.5 3.4 3.4 3.4h9.1v1a8 8 0 0 1-8 8H27Z"/>
+</svg>
