@@ -1,0 +1,159 @@
+# Domain pack BE (backend delivery, Node: NestJS/Express) — dữ liệu của pack.
+# Nguồn của src/manifest.gen.mjs: sửa file này rồi chạy `npm run build`.
+# Schema: PackManifestSchema trong packages/engine/src/pack.mjs.
+# Thứ tự trong các danh sách có ý nghĩa (xuất hiện trong thông báo và output).
+
+id: be
+display_name: BE-Kit
+# Namespace lệnh: /be:<mode> (Claude Code, giai đoạn 2), /be-<mode> (Antigravity).
+plugin: be
+# Lệnh dạng chữ: BE <mode> <task>.
+prompt_prefix: BE
+env_prefix: BE_KIT
+agent_prefix: backend-
+
+tasks_root: docs/backend-tasks
+config_dir: .backend-delivery
+project_config_file: .backend-delivery/standard.yaml
+status_file: tracking/workflow-status.md
+writable_prefixes:
+  - docs/backend-tasks/
+  - docs/backend-context/
+# Thay đổi ở các path này không tính là "sửa ngoài plan" (cộng lockfile của engine).
+scope_ignore:
+  - docs/backend-tasks/
+  - docs/backend-context/
+  - .backend-delivery/
+  # File do `be-kit init` cài hoặc cập nhật.
+  - bin/be-kit.mjs
+  - docs/backend-delivery-quickstart.md
+  - .gitattributes
+  - .agents/
+planned_files_heading: 'File sẽ tạo\s*\/\s*cập nhật'
+task_name_hint: BE-<id>-<slug>
+
+task_files:
+  required_docs:
+    - task.md
+    - planning/implementation-plan.md
+    - planning/build-checklist.md
+    - planning/questions.md
+    - tracking/workflow-status.md
+  empty: []
+  conditional:
+    - tracking/input-sync-report.md
+    - tracking/review-bugs.md
+    - output/review-report.md
+    - output/test-summary.md
+    - output/pr-summary.md
+
+modes:
+  plan:
+    state: planning-mode
+    agent: backend-planner
+    artifacts: [task.md, planning/implementation-plan.md, planning/build-checklist.md, planning/questions.md, tracking/workflow-status.md]
+    next: [input-sync, cook, plan, quick]
+  quick:
+    state: quick-mode
+    agent: null
+    artifacts: [planning/implementation-plan.md, output/review-report.md, output/test-summary.md, tracking/workflow-status.md]
+    next: [pr, review, test, plan, input-sync]
+  input-sync:
+    state: input-sync-mode
+    agent: backend-planner
+    artifacts: [tracking/input-sync-report.md, planning/questions.md, tracking/workflow-status.md]
+    next: [plan, input-sync, cook, bugfix, review]
+  cook:
+    state: implementation-mode
+    agent: backend-developer
+    artifacts: [planning/build-checklist.md, tracking/workflow-status.md]
+    next: [review, cook, input-sync, plan]
+  bugfix:
+    state: bugfix-mode
+    agent: backend-developer
+    artifacts: [tracking/review-bugs.md, tracking/workflow-status.md]
+    next: [review, bugfix, input-sync, test]
+  review:
+    state: review-mode
+    agent: backend-reviewer
+    artifacts: [output/review-report.md, tracking/workflow-status.md]
+    next: [bugfix, input-sync, test, pr]
+  test:
+    state: testing-mode
+    agent: backend-tester
+    artifacts: [output/test-summary.md, tracking/workflow-status.md]
+    next: [pr, bugfix, input-sync, test]
+  pr:
+    state: pr-ready-mode
+    agent: backend-release-manager
+    artifacts: [output/pr-summary.md, tracking/workflow-status.md]
+    next: [bugfix, input-sync, pr]
+
+aliases:
+  build: cook
+  implement: cook
+terminal_next: [none, done, completed, merged]
+always_allowed: [plan, input-sync]
+source_edit_modes: [cook, bugfix, quick]
+source_edit_agent: backend-developer
+source_fix_route: BE bugfix/cook
+plan_update_route: input-sync
+read_inputs_hint: 'Input cần đọc: mục "Input ledger bắt buộc cho BE plan" trong tracking/workflow-status.md.'
+
+rules:
+  always:
+    - core.md
+    - mode-output-contract.md
+    - question-resolution-contract.md
+    - vietnamese-output.md
+    - efficiency-budget-contract.md
+    - untrusted-input-contract.md
+  by_mode:
+    api-contract.md: [plan, input-sync, cook, quick, bugfix, review, pr]
+    security-contract.md: [plan, cook, quick, bugfix, review]
+    clean-code-contract.md: [cook, quick, bugfix, review]
+    evidence-scope-contract.md: [cook, quick, review, test, pr]
+    review-bug-contract.md: [review, bugfix, pr]
+  conditional:
+    # Nạp khi task đổi schema/dữ liệu DB (db_change_required: true).
+    - rule: data-migration-contract.md
+      modes: [plan, input-sync, cook, quick, bugfix, review, test, pr]
+      when_field: db_change_required
+
+mcp:
+  server_name: backend-delivery
+  tool_prefix: be
+  skill_dir: skills/backend-delivery-standard
+  next_prompt_heading: Prompt bước tiếp theo
+  first_command: plan
+  task_prop_description: Tên task (BE-123-abc) hoặc đường dẫn task folder.
+  task_name_description: Tên task dạng BE-<id>-<slug>, vd BE-123-create-order.
+  scope_self_reported: 'Scope: dùng scope_diff_status tự khai.'
+  scope_unavailable: Không tính được scope diff (không phải git repo hoặc không diff được base). Ghi scope_diff_status theo review thủ công và nêu lý do.
+  planned_files_missing: implementation-plan.md chưa khai file nào ở mục "File sẽ tạo / cập nhật" nên không đối chiếu được.
+  status_fields:
+    - current_mode
+    - next_mode
+    - task_type
+    - risk_level
+    - build_ready
+    - blocking_questions_open
+    - api_change_type
+    - api_compat_status
+    - db_change_required
+    - migration_status
+    - rollback_plan_status
+    - review_status
+    - test_status
+    - critical_issues_open
+    - high_issues_open
+    - pr_status
+    - human_override
+  descriptions:
+    begin_mode: 'GỌI ĐẦU TIÊN khi bắt đầu bất kỳ mode BE nào. Trả về mode có được chạy không (câu hỏi blocking, build_ready, API breaking, migration, review), prompt thay thế nếu bị chặn, artifact bắt buộc và nguyên văn rule của mode.'
+    new_task: 'Tạo task folder chuẩn trong docs/backend-tasks/<tên> từ template của kit. Không ghi đè file đã có.'
+    validate_task: Kiểm tra task folder BE có đủ file bắt buộc không.
+    validate_workflow: 'Chạy toàn bộ gate của workflow-status.md BE: schema, câu hỏi blocking, quyết định API/DB, migration và rollback, test evidence, review trước PR. GỌI TRƯỚC KHI KẾT THÚC mọi mode.'
+    scope_diff: So file thực sự thay đổi (git) với bảng "File sẽ tạo / cập nhật" trong implementation-plan.md.
+    next_step: Trả về prompt bước tiếp theo đọc từ tracking/workflow-status.md của task.
+    task_status: 'Tóm tắt trạng thái task BE: mode, gate chính, câu hỏi blocking, issue theo severity. Chỉ đọc.'

@@ -81,7 +81,7 @@ export function evalArgs(name, { level, model, json, outputDir, maxCostUsd, keep
   // `--eval-dir` phải nằm trong thư mục plugin: run.mjs truyền `plugin` là bản sao tạm có kèm evals/.
   const args = ['plugin', 'eval', plugin, '--eval-dir', 'evals', '--ablation', 'none', '--scaffold'];
   args.push('--allow-tools', ...ALLOW_TOOLS);
-  args.push('--allow-real-servers', '--trust-plugin');
+  args.push('--mocks', 'off'); // MCP server thật của plugin (gate nằm ở đó), không dùng mock
   // `onlyCase` (cờ --case của run.mjs) thay bộ lọc của profile: chạy lại một case lẻ.
   if (onlyCase) args.push('--case', onlyCase);
   else if (leg.cases) args.push('--case', leg.cases);

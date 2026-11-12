@@ -1,0 +1,49 @@
+name: Backend Delivery Standard
+
+on:
+  pull_request:
+    paths:
+      - 'docs/backend-tasks/**'
+      - 'docs/backend-context/**'
+      - '.backend-delivery/**'
+      - '.agents/**'
+      - 'src/**'
+      - 'apps/**'
+      - 'libs/**'
+      - 'prisma/**'
+      - 'migrations/**'
+
+jobs:
+  validate-backend-delivery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check kit files
+        run: |
+          if [ -f bin/be-kit.mjs ]; then
+            node bin/be-kit.mjs doctor --strict
+          else
+            echo "bin/be-kit.mjs not installed; skipping"
+          fi
+      - name: Validate changed backend tasks
+        run: |
+          if [ ! -f bin/be-kit.mjs ]; then exit 0; fi
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          TASKS=$(git diff --name-only "$BASE_SHA" "${{ github.sha }}" | awk -F/ '/^docs\/backend-tasks\/[^/]+\// {print $1"/"$2"/"$3}' | sort -u)
+          if [ -z "$TASKS" ]; then
+            echo "No changed backend task folders."
+            exit 0
+          fi
+          for task in $TASKS; do
+            echo "Validating $task"
+            node bin/be-kit.mjs validate-task "$task"
+            node bin/be-kit.mjs validate-workflow "$task" --base "$BASE_SHA"
+            if [ -f "$task/output/pr-summary.md" ]; then
+              node bin/be-kit.mjs validate-pr "$task" --base "$BASE_SHA"
+            fi
+          done

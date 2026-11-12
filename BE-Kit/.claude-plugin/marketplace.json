@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "backend-delivery",
+  "description": "Bộ chuẩn backend delivery tiếng Việt cho Node (NestJS/Express): plan/cook/review/test/pr gate, API contract, migration có rollback, câu hỏi blocking và test evidence.",
+  "owner": {
+    "name": "Backend Platform Team"
+  },
+  "plugins": [
+    {
+      "name": "be",
+      "source": "./plugins/be",
+      "description": "Quy trình backend delivery chuẩn cho Node (NestJS/Express), task-first: BE task (router nhận yêu cầu tự nhiên) cùng BE context/new-task/plan/quick/input-sync/cook/review/bugfix/test/pr, gate API contract, migration có rollback, câu hỏi blocking và test evidence. Mọi artifact viết bằng tiếng Việt có dấu.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Backend Platform Team"
+      },
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "backend",
+        "nestjs",
+        "express",
+        "workflow",
+        "migration",
+        "code-review",
+        "vietnamese"
+      ]
+    }
+  ]
+}

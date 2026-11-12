@@ -1,0 +1,19 @@
+{
+  "name": "@backend-delivery-kit/pack-be",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Domain pack backend delivery (Node: NestJS/Express): manifest (pack.yaml), rule, template, schema workflow-status.md và gate của BE (API contract, migration/rollback, test evidence). Chạy trên engine của BE-Kit.",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "test": "vitest run --dir test"
+  },
+  "dependencies": {
+    "@backend-delivery-kit/engine": "*",
+    "zod": "^4.5.4"
+  }
+}

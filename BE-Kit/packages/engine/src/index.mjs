@@ -1,0 +1,39 @@
+/**
+ * Engine dùng chung của kit. Không chứa khái niệm của domain nào: tên thư mục
+ * task, heading của artifact, mode, agent và gate đều do domain pack truyền vào.
+ */
+export { toPosix, isPathInside, relativePosix, resolveTaskDir } from './paths.mjs';
+export {
+  LOCKFILE_IGNORE,
+  parsePlannedFiles,
+  computeScopeDiff,
+  detectBaseRef,
+  listChangedFiles,
+  onBaseWarning,
+  fingerprintFile,
+  snapshotFiles,
+  filesTouchedSince,
+} from './scope.mjs';
+export {
+  appendRunLog,
+  readRunLog,
+  codesOf,
+  hashSession,
+  RunLogRecordSchema,
+  RUNLOG_FILE_NAME,
+  runLogFileFor,
+  RUNLOG_EVENTS,
+  RUNLOG_MAX_BYTES,
+  RUNLOG_VERSION,
+} from './runlog.mjs';
+export { summarizeRunLog, buildReport, renderReport } from './report.mjs';
+export { loadProjectConfig, PROJECT_CONFIG_DEFAULTS } from './project-config.mjs';
+export { scaffoldTask, isValidTaskName } from './scaffold.mjs';
+export { createStateMachine } from './state-machine.mjs';
+export { parseFrontMatterLoose, realCell } from './frontmatter.mjs';
+export { createModeCompletion } from './completion.mjs';
+export { createModeBriefing } from './briefing.mjs';
+export { createHookHandlers, runHook } from './hook-core.mjs';
+export { createMcpTools } from './mcp-core.mjs';
+export { PackManifestSchema, validateManifest, commandToModeOf, rulesForManifest, allRuleFilesOf } from './pack.mjs';
+export { buildRetroData, renderRetroSummary } from './retro.mjs';

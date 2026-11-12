@@ -1,0 +1,32 @@
+{
+  "description": "Gate runtime của BE-Kit: ghi nhớ mode BE đang chạy, chặn sửa source sai vai/sai gate, không cho mode kết thúc khi workflow-status.md chưa cập nhật. Mức thực thi: biến môi trường BE_KIT_HOOKS=off|warn|enforce.",
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/be-hook.mjs", "UserPromptSubmit"] }] }
+    ],
+    "UserPromptExpansion": [
+      { "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/be-hook.mjs", "UserPromptExpansion"] }] }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell",
+        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/be-hook.mjs", "PreToolUse"] }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__.*__be_begin_mode",
+        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/be-hook.mjs", "PostToolUse"] }]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": ".*backend-.*",
+        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/be-hook.mjs", "SubagentStop"] }]
+      }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/be-hook.mjs", "Stop"] }] }
+    ]
+  }
+}

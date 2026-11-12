@@ -1,0 +1,37 @@
+{
+  "name": "backend-delivery-agent-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bộ chuẩn backend delivery tiếng Việt cho Node (NestJS/Express): plan bám SRS, quyết định API contract và thay đổi DB, migration có rollback, input sync, review, test evidence, PR readiness.",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "bin": {
+    "be-kit": "./bin/be-kit.mjs"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "@backend-delivery-kit/pack-be": "*"
+  },
+  "scripts": {
+    "build": "node build/compile-packs.mjs && node build/bundle.mjs",
+    "build:check": "node build/compile-packs.mjs --check && node build/bundle.mjs --check",
+    "init": "node bin/be-kit.mjs init",
+    "test": "npm run test --workspaces --if-present && npm run test:kit",
+    "test:kit": "vitest run --dir tests --testTimeout=60000 --hookTimeout=60000",
+    "eval:pilot": "npm run build && node evals/run.mjs pilot",
+    "eval:smoke": "npm run build && node evals/run.mjs smoke",
+    "eval:gate": "npm run build && node evals/run.mjs gate",
+    "eval:full": "npm run build && node evals/run.mjs full"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "gray-matter": "^4.0.3",
+    "vitest": "^4.1.11",
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  },
+  "license": "MIT"
+}

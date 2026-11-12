@@ -1,0 +1,5 @@
+---
+applyTo: "docs/backend-tasks/**"
+---
+
+Artifact của task backend: giữ nguyên tiêu đề mục và tên cột của template trong `.backend-delivery/templates/` (gate đọc bảng theo đúng các tên đó). `implementation-plan.md` có API contract, Thay đổi dữ liệu, Migration và rollback, File sẽ tạo / cập nhật, Test. `questions.md` dùng cột `Blocking` (`Có`/`Không`) và `Trạng thái` (`Open`/`Answered`/`Closed`). `test-summary.md` ghi mỗi lệnh đã chạy một dòng trong `Command evidence log`. Viết tiếng Việt có dấu đầy đủ.
